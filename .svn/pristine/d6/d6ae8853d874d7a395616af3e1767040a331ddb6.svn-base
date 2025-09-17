@@ -1,0 +1,115 @@
+#define ADC_DR ((uint32_t)0x4C)	//offset adresu rejestru ADC_DR
+
+#define JOYFIRE GPIO_Pin_12
+#define JOYFIRE_GPIO GPIOA
+
+/*
+LAMPY nixie
+A-zolty
+B-braz
+C-bialy
+D-zielony
+
+BAROMETR
+public:
+bialy - enable dla przetw.HV i DRV8825	-> GND
+zolty - +12V
+zielony - GND
+
+czarny - przycisk czarny
+czerwony - przycisk czerwony
+
+niebieski - DRV8825->DIR 	-> C13
+fiolet - DRV8825->STP		-> B0
+braz - DRV8825->SLP+RST		-> B1
+
+turkus (jasny ziel) - buzzer
+private:
+ziel+czar, czar+bial - HV do NIXIE
+
+LAMPY NIXIE (A,B,C,D)
+
+
+BUZZER: 		B7
+BUTTON BLACK: 	B8
+BUTTON RED: 	B9
+
+
+*/
+
+#define BUTTON_BLACK_PORT	GPIOB
+#define BUTTON_BLACK		GPIO_Pin_8
+#define BUTTON_BLACK_EXTI	EXTI_Line8
+
+#define BUTTON_RED_PORT		GPIOB
+#define BUTTON_RED			GPIO_Pin_9
+#define BUTTON_RED_EXTI		EXTI_Line9
+
+#define BUZZER_PORT		GPIOB
+#define BUZZER			GPIO_Pin_7
+
+
+#define DRV8825_PORT	GPIOC
+#define DRV_DIR			GPIO_Pin_15
+#define DRV_SLP			GPIO_Pin_14
+#define DRV_STP			GPIO_Pin_13
+
+//N0: A0-A3
+#define N0_A_PORT		GPIOA
+#define N0_A			GPIO_Pin_0
+#define N0_B_PORT		GPIOA
+#define N0_B			GPIO_Pin_1
+#define N0_C_PORT		GPIOA
+#define N0_C			GPIO_Pin_2
+#define N0_D_PORT		GPIOA
+#define N0_D			GPIO_Pin_3
+
+//N1: A4-A7
+#define N1_A_PORT		GPIOA
+#define N1_A			GPIO_Pin_4
+#define N1_B_PORT		GPIOA
+#define N1_B			GPIO_Pin_5
+#define N1_C_PORT		GPIOA
+#define N1_C			GPIO_Pin_6
+#define N1_D_PORT		GPIOA
+#define N1_D			GPIO_Pin_7
+
+//N2: B10-B13
+#define N2_A_PORT		GPIOB
+#define N2_A			GPIO_Pin_10
+#define N2_B_PORT		GPIOB
+#define N2_B			GPIO_Pin_11
+#define N2_C_PORT		GPIOB
+#define N2_C			GPIO_Pin_12
+#define N2_D_PORT		GPIOB
+#define N2_D			GPIO_Pin_13
+
+//N3: B14,B15,A9,A8
+#define N3_A_PORT		GPIOA
+#define N3_A			GPIO_Pin_9
+#define N3_B_PORT		GPIOA
+#define N3_B			GPIO_Pin_8
+#define N3_C_PORT		GPIOB
+#define N3_C			GPIO_Pin_14
+#define N3_D_PORT		GPIOB
+#define N3_D			GPIO_Pin_15
+
+//N4: A10,A11,A12,A15
+#define N4_A_PORT		GPIOA
+#define N4_A			GPIO_Pin_10
+#define N4_B_PORT		GPIOA
+#define N4_B			GPIO_Pin_11
+#define N4_C_PORT		GPIOA
+#define N4_C			GPIO_Pin_12
+#define N4_D_PORT		GPIOA
+#define N4_D			GPIO_Pin_15
+
+//N5: B3-B6
+#define N5_A_PORT		GPIOB
+#define N5_A			GPIO_Pin_3
+#define N5_B_PORT		GPIOB
+#define N5_B			GPIO_Pin_4
+#define N5_C_PORT		GPIOB
+#define N5_C			GPIO_Pin_5
+#define N5_D_PORT		GPIOB
+#define N5_D			GPIO_Pin_6

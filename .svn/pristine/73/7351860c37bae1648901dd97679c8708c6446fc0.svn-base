@@ -1,0 +1,380 @@
+#include "main.h"
+#include "stm32f10x_it.h"
+#include "system_init.h"
+#include "RTC_TimeAndCallendar.h"
+#include "Delays.h"
+#include "board.h"
+
+#define SEC01	1
+#define SEC10	3
+#define MIN01	0
+#define MIN10	4
+#define HOUR01	2
+#define HOUR10	5
+
+TrybTypeDef eTrybPracy;
+//volatile enum eWyswTypeDef eWyswietlacz;
+BuzzerTypeDef BuzzerStruct;
+BuzzerTypeDef BuzzerSelect;
+BuzzerTypeDef BuzzerAccept;
+BuzzerTypeDef BuzzerAlarm;
+
+volatile int tik;
+volatile int Tmux;
+volatile BibKal_TimeTypeDef RTC_ActualTimeStruct;
+volatile int32_t DrvKrokCount;
+volatile uint32_t DrvKrokPeriod;
+volatile int32_t pozycja_wskazowki;
+
+int main(void)
+{
+	Nixie_GPIOConfiguration();
+	TIM_Configuration();
+	GPIO_Configuration();
+	RTC_Initialization();
+	NVIC_Initialization();
+
+	eTrybPracy = ZEGAR;
+
+	pozycja_wskazowki = 0;
+	DrvKrokCount = 0;	//inicjalizacja
+	DrvKrokPeriod = DRV_KROK_PERIOD_VALUE;
+	Drv_uspij();
+	Drv_kierunek(LEWO);
+
+	BuzzerStruct.FREQ = 5000;
+	BuzzerStruct.PERIOD = 50;
+	Buzzer_init(&BuzzerStruct);
+
+	BuzzerSelect.FREQ = 2000;
+	BuzzerSelect.PERIOD = 50;
+
+	BuzzerAccept.FREQ = 5000;
+	BuzzerAccept.PERIOD = 100;
+
+	BuzzerAlarm.FREQ = 500;
+	BuzzerAlarm.PERIOD = 500;
+
+    while(1)
+    {
+    	Drv_pozycja(pozycja_wskazowki);
+
+    	//pobranie nowej wartosci zegara co sekundê
+    	if(tik)
+    	{
+    		//obs³uga zdarzeñ co sekundê
+
+    		tik = 0;
+    		//Buzzer_start();
+
+
+    	}
+
+
+    }//end while(1)
+}
+
+//freq: 100Hz-10kHz
+//period: 0...65535 ms
+//vol : 0..100
+void Buzzer_init(BuzzerTypeDef* buz)
+{
+	int32_t v, t;
+
+	t = 50000/buz->FREQ;
+	v = t / 2;	//jesli wypelnienie 50% -> vol=100; wyp<50% -> vol<100; vol=0 -> wyp=0:
+
+	TIM2->ARR = t;
+	TIM2->CCR1 = v;
+
+	TIM4->ARR = buz->PERIOD;
+
+}
+
+void Buzzer_start(void)
+{
+	TIM_Cmd(TIM2, ENABLE);	//rozpocznij generacje dzwieku
+	TIM_Cmd(TIM4, ENABLE);	//odmierzaj czas
+}
+
+void Wyswietl_czas(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, RTC_TimeStruct->SEC % 10);
+		Display_digit(SEC10, RTC_TimeStruct->SEC / 10);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}else if (Tmux == 1)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, RTC_TimeStruct->MIN % 10);
+		Display_digit(MIN10, RTC_TimeStruct->MIN / 10);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}else if(Tmux == 2)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, RTC_TimeStruct->HOUR % 10);
+		Display_digit(HOUR10, RTC_TimeStruct->HOUR / 10);
+	}
+	else
+	{
+	}
+
+}
+
+void Wyswietl_program(uint32_t program)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, program);
+	}
+}
+void Wyswietl_ustaw_zegar_godzina(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, RTC_TimeStruct->HOUR % 10);
+		Display_digit(HOUR10, RTC_TimeStruct->HOUR / 10);
+	}
+}
+
+void Wyswietl_ustaw_zegar_minuta(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, RTC_TimeStruct->MIN % 10);
+		Display_digit(MIN10, RTC_TimeStruct->MIN / 10);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}
+}
+
+void Wyswietl_ustaw_zegar_dzien(BibKal_CalendarTypeDef* RTC_CallendarStruct)
+{
+	if (Tmux == 0)
+	{
+
+		Display_digit(SEC01, RTC_CallendarStruct->WDAY);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}
+}
+void Wyswietl_ustaw_alarm_dzientyg(uint32_t program, BibKal_AlarmTypeDef* RTC_AlarmStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, RTC_AlarmStruct->WDAY);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, program);
+
+	}
+}
+void Wyswietl_ustaw_alarm_godzina(BibKal_AlarmTypeDef* RTC_AlarmStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, RTC_AlarmStruct->HOUR%10);
+		Display_digit(HOUR10, RTC_AlarmStruct->HOUR/10);
+	}
+}
+void Wyswietl_ustaw_alarm_minuta(BibKal_AlarmTypeDef* RTC_AlarmStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, RTC_AlarmStruct->MIN%10);
+		Display_digit(MIN10, RTC_AlarmStruct->MIN/10);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}
+}
+void Wyswietl_ustaw_kalibracja(void)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, 0);
+		Display_digit(SEC10, 0);
+		Display_digit(MIN01, 0);	//zmieniæ
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}
+}
+
+
+void Display_digit(uint32_t dig, uint32_t val)
+{
+	switch (dig)
+	{
+		case 0:
+			GPIO_WriteBit(N0_A_PORT, N0_A, Bit_SET);
+			GPIO_WriteBit(N0_B_PORT, N0_B, Bit_SET);
+			GPIO_WriteBit(N0_C_PORT, N0_C, Bit_SET);
+			GPIO_WriteBit(N0_D_PORT, N0_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N0_A_PORT, N0_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N0_B_PORT, N0_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N0_C_PORT, N0_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N0_D_PORT, N0_D, Bit_RESET);
+			break;
+		case 1:
+			GPIO_WriteBit(N1_A_PORT, N1_A, Bit_SET);
+			GPIO_WriteBit(N1_B_PORT, N1_B, Bit_SET);
+			GPIO_WriteBit(N1_C_PORT, N1_C, Bit_SET);
+			GPIO_WriteBit(N1_D_PORT, N1_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N1_A_PORT, N1_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N1_B_PORT, N1_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N1_C_PORT, N1_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N1_D_PORT, N1_D, Bit_RESET);
+			break;
+		case 2:
+			GPIO_WriteBit(N2_A_PORT, N2_A, Bit_SET);
+			GPIO_WriteBit(N2_B_PORT, N2_B, Bit_SET);
+			GPIO_WriteBit(N2_C_PORT, N2_C, Bit_SET);
+			GPIO_WriteBit(N2_D_PORT, N2_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N2_A_PORT, N2_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N2_B_PORT, N2_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N2_C_PORT, N2_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N2_D_PORT, N2_D, Bit_RESET);
+			break;
+		case 3:
+			GPIO_WriteBit(N3_A_PORT, N3_A, Bit_SET);
+			GPIO_WriteBit(N3_B_PORT, N3_B, Bit_SET);
+			GPIO_WriteBit(N3_C_PORT, N3_C, Bit_SET);
+			GPIO_WriteBit(N3_D_PORT, N3_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N3_A_PORT, N3_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N3_B_PORT, N3_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N3_C_PORT, N3_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N3_D_PORT, N3_D, Bit_RESET);
+			break;
+		case 4:
+			GPIO_WriteBit(N4_A_PORT, N4_A, Bit_SET);
+			GPIO_WriteBit(N4_B_PORT, N4_B, Bit_SET);
+			GPIO_WriteBit(N4_C_PORT, N4_C, Bit_SET);
+			GPIO_WriteBit(N4_D_PORT, N4_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N4_A_PORT, N4_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N4_B_PORT, N4_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N4_C_PORT, N4_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N4_D_PORT, N4_D, Bit_RESET);
+			break;
+		case 5:
+			GPIO_WriteBit(N5_A_PORT, N5_A, Bit_SET);
+			GPIO_WriteBit(N5_B_PORT, N5_B, Bit_SET);
+			GPIO_WriteBit(N5_C_PORT, N5_C, Bit_SET);
+			GPIO_WriteBit(N5_D_PORT, N5_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N5_A_PORT, N5_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N5_B_PORT, N5_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N5_C_PORT, N5_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N5_D_PORT, N5_D, Bit_RESET);
+			break;
+		default:
+			break;
+	}
+
+
+
+}
+
+void Drv_kierunek(BitAction kier)
+{
+	GPIO_WriteBit(DRV_DIR_PORT, DRV_DIR, kier);	//ustaw kierunek
+}
+
+/*
+ * angle: pozycja w jedn 0.1stopnia
+ */
+#define SM_STEP 9	//krok silnika w jedn. 0.1stopnia
+int32_t Drv_pozycja(int32_t angle)
+{
+	int32_t position;
+
+	position = 32 * angle / SM_STEP;
+
+	if (DrvKrokCount < position)
+	{
+		Drv_kierunek(PRAWO);
+		Drv_krok();
+		DrvKrokCount++;
+	}
+	else if (DrvKrokCount > position)
+	{
+		Drv_kierunek(LEWO);
+		Drv_krok();
+		DrvKrokCount--;
+	}
+
+	return DrvKrokCount;
+}
+
+void Drv_krok(void)
+{
+	GPIO_WriteBit(DRV_STP_PORT, DRV_STP, Bit_SET);
+	Delay_us(10);
+	GPIO_WriteBit(DRV_STP_PORT, DRV_STP, Bit_RESET);
+}
+
+void Drv_uspij(void)
+{
+	GPIO_WriteBit(DRV_SLP_PORT, DRV_SLP, Bit_RESET);	//wylacz driver silnika
+}
+
+void Drv_obodz(void)
+{
+	GPIO_WriteBit(DRV_SLP_PORT, DRV_SLP, Bit_SET);	//wylacz driver silnika
+}
+
+
+//przyblilzona funkcja pierwiastkowania metoda babilonska
+/*
+uint32_t pierwiastek(uint32_t val, int32_t err)
+{
+	uint32_t i, imax=50, x, xp;
+	int32_t e;
+
+	i=0;
+	x = xp = 10;
+	do
+	{
+		x = (x + val/x)/2;
+		e = x - xp;
+
+		if (e < 0) e= -e;
+
+		xp = x;	//zapamietaj x z tej iteracji
+		i++;
+	}while(e > err || i > imax);
+
+	return x;
+}
+*/
+

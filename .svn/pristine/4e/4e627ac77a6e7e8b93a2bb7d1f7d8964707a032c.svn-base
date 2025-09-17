@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<history>
+   <processor signature="arm-none-eabi-gcc noversion nomachine -mcpu=cortex-m3 -mthumb -Wall -ffunction-sections -g -O0 -c -DSTM32F103C8 -DSTM32F10X_MD -DUSE_STDPERIPH_DRIVER -D__ASSEMBLY__ -I..\..\..\workspace\NIXIEclock\cmsis_boot -I..\..\..\workspace\NIXIEclock\stm_lib\inc -I..\..\..\workspace\NIXIEclock\stm_lib -I..\..\..\workspace -I..\..\..\workspace\NIXIEclock -I..\..\..\workspace\Alarm_Biblioteki -I..\..\..\workspace\NIXIEclock\cmsis -I..\..\..\workspace\Alarm_CPU -I..\..\..">
+      <target file="stm32f10x_iwdg.o" lastModified="161685bbfa6">
+         <source file="..\..\..\stm_lib\src\stm32f10x_iwdg.c" lastModified="1608f4deadc"/>
+      </target>
+      <target file="stm32f10x_rcc.o" lastModified="161685bbc01">
+         <source file="..\..\..\stm_lib\src\stm32f10x_rcc.c" lastModified="1608f4db286"/>
+      </target>
+      <target file="stm32f10x_it.o" lastModified="161685bbdfd">
+         <source file="..\..\..\stm32f10x_it.c" lastModified="16168508ba7"/>
+      </target>
+      <target file="stm32f10x_pwr.o" lastModified="161685bb8bf">
+         <source file="..\..\..\stm_lib\src\stm32f10x_pwr.c" lastModified="1608f4dbcb7"/>
+      </target>
+      <target file="printf.o" lastModified="161685bbb7e">
+         <source file="..\..\..\stdio\printf.c" lastModified="1608f4d827c"/>
+      </target>
+      <target file="RTC_TimeAndCallendar.o" lastModified="161685bb7e3">
+         <source file="..\..\..\RTC_TimeAndCallendar.c" lastModified="161684f96ae"/>
+      </target>
+      <target file="misc.o" lastModified="161685bbed3">
+         <source file="..\..\..\stm_lib\src\misc.c" lastModified="1608f4e4279"/>
+      </target>
+      <target file="startup_stm32f10x_md.o" lastModified="161685bb90b">
+         <source file="..\..\..\cmsis_boot\startup\startup_stm32f10x_md.c" lastModified="1608f4da14f"/>
+      </target>
+      <target file="Biblioteka_Kalendarz.o" lastModified="161685bbce0">
+         <source file="..\..\..\..\Alarm_Biblioteki\Biblioteka_Kalendarz.c" lastModified="154df2735d1"/>
+      </target>
+      <target file="stm32f10x_bkp.o" lastModified="161685bbf3f">
+         <source file="..\..\..\stm_lib\src\stm32f10x_bkp.c" lastModified="1608f4dc812"/>
+      </target>
+      <target file="stm32f10x_gpio.o" lastModified="161685bb986">
+         <source file="..\..\..\stm_lib\src\stm32f10x_gpio.c" lastModified="1608f4dd2a5"/>
+      </target>
+      <target file="stm32f10x_rtc.o" lastModified="161685bb686">
+         <source file="..\..\..\stm_lib\src\stm32f10x_rtc.c" lastModified="1608f4de30d"/>
+      </target>
+      <target file="stm32f10x_exti.o" lastModified="161685bbc6c">
+         <source file="..\..\..\stm_lib\src\stm32f10x_exti.c" lastModified="1608f4dda90"/>
+      </target>
+      <target file="system_stm32f10x.o" lastModified="161685bb852">
+         <source file="..\..\..\cmsis_boot\system_stm32f10x.c" lastModified="1612a81a9c5"/>
+      </target>
+      <target file="system_init.o" lastModified="161685bba06">
+         <source file="..\..\..\system_init.c" lastModified="16167d6ff63"/>
+      </target>
+      <target file="stm32f10x_tim.o" lastModified="161685bb75a">
+         <source file="..\..\..\stm_lib\src\stm32f10x_tim.c" lastModified="1608f4df741"/>
+      </target>
+      <target file="stm32f10x_adc.o" lastModified="161685bbd69">
+         <source file="..\..\..\stm_lib\src\stm32f10x_adc.c" lastModified="1608f4e0466"/>
+      </target>
+      <target file="stm32f10x_dma.o" lastModified="161685bbe6b">
+         <source file="..\..\..\stm_lib\src\stm32f10x_dma.c" lastModified="16098a20b05"/>
+      </target>
+      <target file="Delays.o" lastModified="161685bba73">
+         <source file="..\..\..\Delays.c" lastModified="154df26a180"/>
+      </target>
+      <target file="main.o" lastModified="161685bbb07">
+         <source file="..\..\..\main.c" lastModified="161685bb3f1"/>
+      </target>
+   </processor>
+</history>

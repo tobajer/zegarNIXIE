@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<history>
+   <processor signature="arm-none-eabi-gcc -mcpu=cortex-m3 -mthumb -g -nostartfiles -Map=NIXIEclock.map -O0 --gc-sections -LC:\CooCox\CoIDE\configuration\ProgramData\NIXIEclock -TC:\CooCox\CoIDE\configuration\ProgramData\NIXIEclock/arm-gcc-link.ld -g -L..\..\..\..\..\..\..\Program Files (x86)\GNU Tools ARM Embedded\4.8 2014q3\arm-none-eabi\lib\armv7e-m\softfp -lm">
+      <target file="NIXIEclock.elf" lastModified="161a35d8d68">
+         <source file="..\..\..\..\..\..\..\Program Files (x86)\GNU Tools ARM Embedded\4.8 2014q3\arm-none-eabi\lib\armv7e-m\softfp\libm.a" lastModified="147a2fbc5f8"/>
+         <source file="..\obj\stm32f10x_rtc.o" lastModified="161a35d80f6"/>
+         <source file="..\obj\stm32f10x_tim.o" lastModified="161a35d81cf"/>
+         <source file="..\obj\RTC_TimeAndCallendar.o" lastModified="161a35d824b"/>
+         <source file="..\obj\system_stm32f10x.o" lastModified="161a35d82b4"/>
+         <source file="..\obj\stm32f10x_pwr.o" lastModified="161a35d831c"/>
+         <source file="..\obj\startup_stm32f10x_md.o" lastModified="161a35d8364"/>
+         <source file="..\obj\stm32f10x_gpio.o" lastModified="161a35d83db"/>
+         <source file="..\obj\system_init.o" lastModified="161a35d845d"/>
+         <source file="..\obj\Delays.o" lastModified="161a35d84c9"/>
+         <source file="..\obj\main.o" lastModified="161a35d8564"/>
+         <source file="..\obj\printf.o" lastModified="161a35d85d7"/>
+         <source file="..\obj\stm32f10x_rcc.o" lastModified="161a35d8659"/>
+         <source file="..\obj\stm32f10x_exti.o" lastModified="161a35d86c0"/>
+         <source file="..\obj\Biblioteka_Kalendarz.o" lastModified="161a35d8732"/>
+         <source file="..\obj\stm32f10x_adc.o" lastModified="161a35d87bb"/>
+         <source file="..\obj\stm32f10x_flash.o" lastModified="161a35d8841"/>
+         <source file="..\obj\stm32f10x_it.o" lastModified="161a35d88d9"/>
+         <source file="..\obj\stm32f10x_dma.o" lastModified="161a35d8947"/>
+         <source file="..\obj\misc.o" lastModified="161a35d89ae"/>
+         <source file="..\obj\stm32f10x_bkp.o" lastModified="161a35d8a1a"/>
+         <source file="..\obj\eeprom.o" lastModified="161a35d8a9f"/>
+         <source file="..\obj\stm32f10x_iwdg.o" lastModified="161a35d8b02"/>
+      </target>
+   </processor>
+</history>

@@ -1,0 +1,255 @@
+#include "main.h"
+#include "stm32f10x_it.h"
+#include "system_init.h"
+#include "RTC_TimeAndCallendar.h"
+#include "Delays.h"
+#include "board.h"
+
+#define SEC01	1
+#define SEC10	3
+#define MIN01	0
+#define MIN10	4
+#define HOUR01	2
+#define HOUR10	5
+
+volatile TrybTypeDef eTrybPracy;
+//volatile enum eWyswTypeDef eWyswietlacz;
+
+volatile int tik;
+volatile int Tmux;
+volatile BibKal_TimeTypeDef RTC_ActualTimeStruct;
+
+int main(void)
+{
+
+
+	Nixie_GPIOConfiguration();
+	TIM_Configuration();
+	Buttons_Configuration();
+	RTC_Initialization();
+	NVIC_Initialization();
+
+	eTrybPracy = ZEGAR;
+//	eWyswietlacz = WYSW_ZEGAR;
+//	program = 0;
+
+	GPIO_WriteBit(DRV8825_PORT, DRV_SLP, Bit_RESET);	//wylacz driver silnika
+	GPIO_WriteBit(BUZZER_PORT, BUZZER, Bit_RESET);	//wylacz buzzer
+
+    while(1)
+    {
+
+    	//pobranie nowej wartosci zegara co sekundê
+    	if(tik)
+    	{
+    		//obs³uga zdarzeñ co sekundê
+
+    		tik = 0;
+//			if (PeriodTimeSet > 0)
+//				PeriodTimeSet--;
+
+    	}
+
+
+    }//end while(1)
+}
+
+void Wyswietl_program(uint32_t program)
+{
+	Display_digit(SEC01, 15);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 15);
+	Display_digit(MIN10, 15);
+	Display_digit(HOUR01, 15);
+	Display_digit(HOUR10, program);
+}
+
+void Wyswietl_czas(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, RTC_TimeStruct->SEC % 10);
+		Display_digit(SEC10, RTC_TimeStruct->SEC / 10);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}else if (Tmux == 1)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, RTC_TimeStruct->MIN % 10);
+		Display_digit(MIN10, RTC_TimeStruct->MIN / 10);
+		Display_digit(HOUR01, 15);
+		Display_digit(HOUR10, 15);
+	}else if(Tmux == 2)
+	{
+		Display_digit(SEC01, 15);
+		Display_digit(SEC10, 15);
+		Display_digit(MIN01, 15);
+		Display_digit(MIN10, 15);
+		Display_digit(HOUR01, RTC_TimeStruct->HOUR % 10);
+		Display_digit(HOUR10, RTC_TimeStruct->HOUR / 10);
+	}
+	else
+	{
+	}
+
+}
+
+void Wyswietl_ustaw_zegar_godzina(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	Display_digit(SEC01, 15);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 15);
+	Display_digit(MIN10, 15);
+	Display_digit(HOUR01, RTC_TimeStruct->HOUR % 10);
+	Display_digit(HOUR10, RTC_TimeStruct->HOUR / 10);
+}
+
+void Wyswietl_ustaw_zegar_minuta(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	Display_digit(SEC01, 15);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, RTC_TimeStruct->MIN % 10);
+	Display_digit(MIN10, RTC_TimeStruct->MIN / 10);
+	Display_digit(HOUR01, 15);
+	Display_digit(HOUR10, 15);
+}
+
+void Wyswietl_ustaw_zegar_dzien(BibKal_CalendarTypeDef* RTC_CallendarStruct)
+{
+	Display_digit(SEC01, RTC_CallendarStruct->WDAY);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 15);
+	Display_digit(MIN10, 15);
+	Display_digit(HOUR10, 15);
+	Display_digit(HOUR10, 15);
+}
+void Wyswietl_ustaw_alarm_godzina(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	Display_digit(SEC01, 15);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 15);
+	Display_digit(MIN10, 15);
+	Display_digit(HOUR10, 0);	//zmieniæ
+	Display_digit(HOUR10, 0);	//zmieniæ
+}
+void Wyswietl_ustaw_alarm_minuta(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	Display_digit(SEC01, 15);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 0);	//zmieniæ
+	Display_digit(MIN10, 0);	//zmieniæ
+	Display_digit(HOUR10, 15);
+	Display_digit(HOUR10, 15);
+}
+void Wyswietl_ustaw_kalibracja(void)
+{
+	Display_digit(SEC01, 0);
+	Display_digit(SEC10, 0);
+	Display_digit(MIN01, 0);	//zmieniæ
+	Display_digit(MIN10, 15);
+	Display_digit(HOUR10, 15);
+	Display_digit(HOUR10, 15);
+}
+
+
+void Display_digit(uint32_t dig, uint32_t val)
+{
+	switch (dig)
+	{
+		case 0:
+			GPIO_WriteBit(N0_A_PORT, N0_A, Bit_SET);
+			GPIO_WriteBit(N0_B_PORT, N0_B, Bit_SET);
+			GPIO_WriteBit(N0_C_PORT, N0_C, Bit_SET);
+			GPIO_WriteBit(N0_D_PORT, N0_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N0_A_PORT, N0_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N0_B_PORT, N0_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N0_C_PORT, N0_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N0_D_PORT, N0_D, Bit_RESET);
+			break;
+		case 1:
+			GPIO_WriteBit(N1_A_PORT, N1_A, Bit_SET);
+			GPIO_WriteBit(N1_B_PORT, N1_B, Bit_SET);
+			GPIO_WriteBit(N1_C_PORT, N1_C, Bit_SET);
+			GPIO_WriteBit(N1_D_PORT, N1_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N1_A_PORT, N1_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N1_B_PORT, N1_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N1_C_PORT, N1_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N1_D_PORT, N1_D, Bit_RESET);
+			break;
+		case 2:
+			GPIO_WriteBit(N2_A_PORT, N2_A, Bit_SET);
+			GPIO_WriteBit(N2_B_PORT, N2_B, Bit_SET);
+			GPIO_WriteBit(N2_C_PORT, N2_C, Bit_SET);
+			GPIO_WriteBit(N2_D_PORT, N2_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N2_A_PORT, N2_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N2_B_PORT, N2_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N2_C_PORT, N2_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N2_D_PORT, N2_D, Bit_RESET);
+			break;
+		case 3:
+			GPIO_WriteBit(N3_A_PORT, N3_A, Bit_SET);
+			GPIO_WriteBit(N3_B_PORT, N3_B, Bit_SET);
+			GPIO_WriteBit(N3_C_PORT, N3_C, Bit_SET);
+			GPIO_WriteBit(N3_D_PORT, N3_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N3_A_PORT, N3_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N3_B_PORT, N3_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N3_C_PORT, N3_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N3_D_PORT, N3_D, Bit_RESET);
+			break;
+		case 4:
+			GPIO_WriteBit(N4_A_PORT, N4_A, Bit_SET);
+			GPIO_WriteBit(N4_B_PORT, N4_B, Bit_SET);
+			GPIO_WriteBit(N4_C_PORT, N4_C, Bit_SET);
+			GPIO_WriteBit(N4_D_PORT, N4_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N4_A_PORT, N4_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N4_B_PORT, N4_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N4_C_PORT, N4_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N4_D_PORT, N4_D, Bit_RESET);
+			break;
+		case 5:
+			GPIO_WriteBit(N5_A_PORT, N5_A, Bit_SET);
+			GPIO_WriteBit(N5_B_PORT, N5_B, Bit_SET);
+			GPIO_WriteBit(N5_C_PORT, N5_C, Bit_SET);
+			GPIO_WriteBit(N5_D_PORT, N5_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N5_A_PORT, N5_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N5_B_PORT, N5_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N5_C_PORT, N5_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N5_D_PORT, N5_D, Bit_RESET);
+			break;
+		default:
+			break;
+	}
+
+
+
+}
+
+
+//przyblilzona funkcja pierwiastkowania metoda babilonska
+/*
+uint32_t pierwiastek(uint32_t val, int32_t err)
+{
+	uint32_t i, imax=50, x, xp;
+	int32_t e;
+
+	i=0;
+	x = xp = 10;
+	do
+	{
+		x = (x + val/x)/2;
+		e = x - xp;
+
+		if (e < 0) e= -e;
+
+		xp = x;	//zapamietaj x z tej iteracji
+		i++;
+	}while(e > err || i > imax);
+
+	return x;
+}
+*/
+

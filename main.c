@@ -1,0 +1,465 @@
+#include <stm32f10x.h>
+#include "stm32f10x_it.h"
+#include "system_init.h"
+#include "RTC_TimeAndCallendar.h"
+#include "Delays.h"
+#include "board.h"
+#include "main.h"
+#include "eeprom.h"
+#include "basic_math.h"
+
+#define SEC01	1
+#define SEC10	3
+#define MIN01	0
+#define MIN10	4
+#define HOUR01	2
+#define HOUR10	5
+
+TrybTypeDef eTrybPracy;
+//volatile enum eWyswTypeDef eWyswietlacz;
+BuzzerTypeDef BuzzerStruct;
+BuzzerTypeDef BuzzerSelect;
+BuzzerTypeDef BuzzerAccept;
+BuzzerTypeDef BuzzerAlarm;
+
+volatile int Tmux, nuta_fade;
+volatile BibKal_TimeTypeDef RTC_ActualTimeStruct;
+volatile int32_t DrvKrokCount;
+volatile uint32_t DrvKrokPeriod;
+volatile int32_t pozycja_wskazowki;
+//volatile uint8_t Buzzer_aktywny;	//aktywny alarm budzika
+
+/*
+ * EEPROM emulated space
+ * VirtAddVarTab	znaczenie
+ * 1000				alarm niedziela
+ * 1001				alarm poniedzialek
+ * 1002				alarm wtorek
+ * 1003				alarm sroda
+ * 1004				alarm czwartek
+ * 1005				alarm piatek
+ * 1006				alarm sobota
+ *
+ */
+uint16_t VirtAddVarTab[NumbOfVar]={1000,1001,1002,1003,1004,1005,1006};
+
+extern BibKal_CalendarTypeDef RTC_ActualCallendarStruct;	//definicja w stm32f10x_it.c
+extern BibKal_AlarmTypeDef RTC_Budzik[7], RTC_BudzikTemp;	//definicja w stm32f10x_it.c
+
+extern int32_t Muzyka;
+extern uint16_t idx_nuta_dzwiek;
+extern uint16_t pelna_nuta;
+extern uint16_t melodia1[];
+extern uint16_t *melodie[];
+
+int main(void)
+{
+	int32_t tablica_pozycji_wskazowki[7]={0, 450, 900, 1395, 1850, 2310, 2785};
+	int32_t q, i;
+	uint16_t eerr, u16data;
+
+	SystemInit();
+
+	Nixie_GPIOConfiguration();
+	TIM_Configuration();
+	GPIO_Configuration();
+	RTC_Initialization();
+	NVIC_Initialization();
+
+	eTrybPracy = ZEGAR;
+
+	pozycja_wskazowki = 0;
+	DrvKrokCount = 0;	//inicjalizacja
+	DrvKrokPeriod = DRV_KROK_PERIOD_VALUE;
+	Drv_obodz();
+	Drv_kierunek(LEWO);
+
+	FLASH_Unlock();//unlock flash writing
+	eerr = EE_Init();
+	FLASH_Lock();//unlock flash writing
+
+	BuzzerStruct.FREQ = 523;
+	BuzzerStruct.PERIOD = 50;
+	Buzzer_init(&BuzzerStruct);
+
+	BuzzerSelect.FREQ = 2000;
+	BuzzerSelect.PERIOD = 50;
+
+	BuzzerAccept.FREQ = 4000;
+	BuzzerAccept.PERIOD = 100;
+
+	BuzzerAlarm.FREQ = 500;
+	BuzzerAlarm.PERIOD = 500;
+
+
+//	Buzzer_aktywny = 1;	//1 - aktywny; 0 - nieaktywny
+
+/*	for (i=0;i<100;i++)
+		r[i] = random8ML(1, 5);	//Muzyka indeksowana od 1
+	Muzyka = r[0];
+	pelna_nuta = melodie[Muzyka][0];
+	idx_nuta_dzwiek = 1;	//poczatek nut
+	BuzzerStruct.FREQ = 500;
+	BuzzerStruct.PERIOD = 1;
+	Buzzer_init(&BuzzerStruct);
+	Buzzer_start();
+*/
+	Bazowanie_wskazowki();
+
+
+    //odczytaj zapisane alarmy
+    for(i=0;i<7;i++)
+    {
+		if (!EE_ReadVariable(VirtAddVarTab[i], &u16data))
+		{
+			RTC_Budzik[i].SEC = 0;
+			RTC_Budzik[i].MIN = u16data & 0x00ff;
+			RTC_Budzik[i].HOUR = (u16data & 0xff00) >> 8;
+		}
+		else
+		{
+			RTC_Budzik[i].SEC = 0;
+			RTC_Budzik[i].MIN = 0;
+			RTC_Budzik[i].HOUR = 0;
+		}
+    }
+
+	q=0;
+    while(1)
+    {
+    	pozycja_wskazowki = tablica_pozycji_wskazowki[RTC_ActualCallendarStruct.WDAY];
+    	Drv_pozycja(pozycja_wskazowki);
+		Delay_ms(10);	//sterowanie szybkoscia przesuwu wskazowki
+
+    }//end while(1)
+}
+
+/*
+ *
+ */
+void Bazowanie_wskazowki(void)
+{
+	while(Drv_pozycja(-4000))
+	{
+		Delay_ms(5);
+	}
+
+	Drv_KrokCount_Reset();
+}
+
+//freq: 100Hz-10kHz
+//period: 0...65535 ms
+//vol : 0..100
+void Buzzer_init(BuzzerTypeDef* buz)
+{
+	uint32_t x, y;
+
+	if (buz->FREQ)
+	{
+		TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);		//zapewnij generacje dzwieku
+		x = (SYSCLK_FREQ_56MHz / (uint32_t)buz->FREQ);	//
+		y = 1;
+		while(x > 65535)
+		{
+			y <<= 1;	//y*2
+			x >>= 1;
+		}
+
+		//jesli f=1 to przerwa z brzmieniem poprzedniej nuty
+		if (buz->FREQ > 1)
+		{
+			TIM2->PSC = y - 1;
+			TIM2->ARR = x - 1;
+			TIM2->CCR1 = x >> 1;	//duty 50%
+		}
+
+		TIM4->CNT = 0;
+		TIM4->ARR = buz->PERIOD;
+	}
+	else
+	{
+		//jesli FREQ = 0, oznacza to przerwe/pauze - cisza
+		GPIO_WriteBit(BUZZER_PORT, BUZZER, Bit_RESET);	//stan niski na wyj. Buzzer'a
+		TIM_ITConfig(TIM2, TIM_IT_Update, DISABLE);		//nie generuj dzwieku
+	}
+
+
+}
+
+void Buzzer_start(void)
+{
+	TIM_Cmd(TIM2, ENABLE);	//rozpocznij generacje dzwieku
+	TIM_Cmd(TIM4, ENABLE);	//odmierzaj czas
+}
+
+void Wyswietl_czas(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	Wyswietl_nic();
+	if (Tmux < 2)
+	{
+		Display_digit(SEC01, RTC_TimeStruct->SEC % 10);
+		Display_digit(SEC10, RTC_TimeStruct->SEC / 10);
+		Display_digit(MIN01, RTC_TimeStruct->MIN % 10);
+		Display_digit(MIN10, RTC_TimeStruct->MIN / 10);
+		Display_digit(HOUR01, RTC_TimeStruct->HOUR % 10);
+		Display_digit(HOUR10, RTC_TimeStruct->HOUR / 10);
+	}
+
+}
+
+void Wyswietl_ustaw_zegar_godzina(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(HOUR01, RTC_TimeStruct->HOUR % 10);
+		Display_digit(HOUR10, RTC_TimeStruct->HOUR / 10);
+	}
+	else
+		Wyswietl_nic();
+}
+
+void Wyswietl_ustaw_zegar_minuta(BibKal_TimeTypeDef* RTC_TimeStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(MIN01, RTC_TimeStruct->MIN % 10);
+		Display_digit(MIN10, RTC_TimeStruct->MIN / 10);
+	}
+	else
+		Wyswietl_nic();
+}
+
+void Wyswietl_ustaw_zegar_dzientyg(BibKal_CalendarTypeDef* RTC_CallendarStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, RTC_CallendarStruct->WDAY);
+	}
+	else
+		Wyswietl_nic();
+}
+
+void Wyswietl_ustaw_alarm_dzientyg(uint32_t program, BibKal_AlarmTypeDef* RTC_AlarmStruct)
+{
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, RTC_AlarmStruct->WDAY);
+		Display_digit(HOUR10, program);
+	}
+	else
+		Wyswietl_nic();
+}
+
+void Wyswietl_ustaw_alarm_godzina(BibKal_AlarmTypeDef* RTC_AlarmStruct)
+{
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 15);
+	Display_digit(MIN10, 15);
+	if (Tmux == 0)
+		Display_digit(SEC01, RTC_AlarmStruct->WDAY);
+	else if (Tmux==1)
+	{
+		Display_digit(HOUR01, RTC_AlarmStruct->HOUR%10);
+		Display_digit(HOUR10, RTC_AlarmStruct->HOUR/10);
+	}
+	else
+		Wyswietl_nic();
+}
+
+void Wyswietl_ustaw_alarm_minuta(BibKal_AlarmTypeDef* RTC_AlarmStruct)
+{
+	Display_digit(SEC10, 15);
+	Display_digit(HOUR01, 15);
+	Display_digit(HOUR10, 15);
+	if (Tmux == 0)
+		Display_digit(SEC01, RTC_AlarmStruct->WDAY);
+	else if (Tmux==1)
+	{
+		Display_digit(MIN01, RTC_AlarmStruct->MIN%10);
+		Display_digit(MIN10, RTC_AlarmStruct->MIN/10);
+	}
+	else
+		Wyswietl_nic();
+}
+
+void Wyswietl_odczyt_alarmu(uint32_t wday)
+{
+	Wyswietl_nic();
+	if (Tmux == 0)
+	{
+		Display_digit(SEC01, wday);
+	}else if (Tmux == 1)
+	{
+		Display_digit(MIN01, RTC_Budzik[wday].MIN % 10);
+		Display_digit(MIN10, RTC_Budzik[wday].MIN / 10);
+	}else if(Tmux == 2)
+	{
+		Display_digit(HOUR01, RTC_Budzik[wday].HOUR % 10);
+		Display_digit(HOUR10, RTC_Budzik[wday].HOUR / 10);
+	}
+}
+
+void Wyswietl_nic(void)
+{
+	Display_digit(SEC01, 15);
+	Display_digit(SEC10, 15);
+	Display_digit(MIN01, 15);
+	Display_digit(MIN10, 15);
+	Display_digit(HOUR01, 15);
+	Display_digit(HOUR10, 15);
+}
+
+void Display_digit(uint32_t dig, uint32_t val)
+{
+	switch (dig)
+	{
+		case 0:
+			GPIO_WriteBit(N0_A_PORT, N0_A, Bit_SET);
+			GPIO_WriteBit(N0_B_PORT, N0_B, Bit_SET);
+			GPIO_WriteBit(N0_C_PORT, N0_C, Bit_SET);
+			GPIO_WriteBit(N0_D_PORT, N0_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N0_A_PORT, N0_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N0_B_PORT, N0_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N0_C_PORT, N0_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N0_D_PORT, N0_D, Bit_RESET);
+			break;
+		case 1:
+			GPIO_WriteBit(N1_A_PORT, N1_A, Bit_SET);
+			GPIO_WriteBit(N1_B_PORT, N1_B, Bit_SET);
+			GPIO_WriteBit(N1_C_PORT, N1_C, Bit_SET);
+			GPIO_WriteBit(N1_D_PORT, N1_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N1_A_PORT, N1_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N1_B_PORT, N1_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N1_C_PORT, N1_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N1_D_PORT, N1_D, Bit_RESET);
+			break;
+		case 2:
+			GPIO_WriteBit(N2_A_PORT, N2_A, Bit_SET);
+			GPIO_WriteBit(N2_B_PORT, N2_B, Bit_SET);
+			GPIO_WriteBit(N2_C_PORT, N2_C, Bit_SET);
+			GPIO_WriteBit(N2_D_PORT, N2_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N2_A_PORT, N2_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N2_B_PORT, N2_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N2_C_PORT, N2_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N2_D_PORT, N2_D, Bit_RESET);
+			break;
+		case 3:
+			GPIO_WriteBit(N3_A_PORT, N3_A, Bit_SET);
+			GPIO_WriteBit(N3_B_PORT, N3_B, Bit_SET);
+			GPIO_WriteBit(N3_C_PORT, N3_C, Bit_SET);
+			GPIO_WriteBit(N3_D_PORT, N3_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N3_A_PORT, N3_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N3_B_PORT, N3_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N3_C_PORT, N3_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N3_D_PORT, N3_D, Bit_RESET);
+			break;
+		case 4:
+			GPIO_WriteBit(N4_A_PORT, N4_A, Bit_SET);
+			GPIO_WriteBit(N4_B_PORT, N4_B, Bit_SET);
+			GPIO_WriteBit(N4_C_PORT, N4_C, Bit_SET);
+			GPIO_WriteBit(N4_D_PORT, N4_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N4_A_PORT, N4_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N4_B_PORT, N4_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N4_C_PORT, N4_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N4_D_PORT, N4_D, Bit_RESET);
+			break;
+		case 5:
+			GPIO_WriteBit(N5_A_PORT, N5_A, Bit_SET);
+			GPIO_WriteBit(N5_B_PORT, N5_B, Bit_SET);
+			GPIO_WriteBit(N5_C_PORT, N5_C, Bit_SET);
+			GPIO_WriteBit(N5_D_PORT, N5_D, Bit_SET);
+			if (!(val & 0x01)) GPIO_WriteBit(N5_A_PORT, N5_A, Bit_RESET);
+			if (!(val & 0x02)) GPIO_WriteBit(N5_B_PORT, N5_B, Bit_RESET);
+			if (!(val & 0x04)) GPIO_WriteBit(N5_C_PORT, N5_C, Bit_RESET);
+			if (!(val & 0x08)) GPIO_WriteBit(N5_D_PORT, N5_D, Bit_RESET);
+			break;
+		default:
+			break;
+	}
+
+
+
+}
+
+void Drv_kierunek(BitAction kier)
+{
+	GPIO_WriteBit(DRV_DIR_PORT, DRV_DIR, kier);	//ustaw kierunek
+}
+
+/*
+ * angle: pozycja w jedn 0.1stopnia
+ */
+#define SM_STEP 200	//krok silnika w jedn. 0.1stopnia
+int32_t Drv_pozycja(int32_t angle)
+{
+	int32_t position, ret;
+
+	position = 32 * angle / SM_STEP;
+
+	if (DrvKrokCount < position)
+	{
+		Drv_kierunek(LEWO);
+		Drv_krok();
+		DrvKrokCount++;
+		ret = 1;
+	}
+	else if (DrvKrokCount > position)
+	{
+		Drv_kierunek(PRAWO);
+		Drv_krok();
+		DrvKrokCount--;
+		ret = 1;
+	}
+	else
+		ret = 0;
+
+	return ret;
+}
+
+void Drv_KrokCount_Reset(void)
+{
+	DrvKrokCount = 0;
+}
+
+void Drv_krok(void)
+{
+	GPIO_WriteBit(DRV_STP_PORT, DRV_STP, Bit_SET);
+	Delay_us(10);
+	GPIO_WriteBit(DRV_STP_PORT, DRV_STP, Bit_RESET);
+}
+
+void Drv_uspij(void)
+{
+	GPIO_WriteBit(DRV_SLP_PORT, DRV_SLP, Bit_RESET);	//wylacz driver silnika
+}
+
+void Drv_obodz(void)
+{
+	GPIO_WriteBit(DRV_SLP_PORT, DRV_SLP, Bit_SET);	//wylacz driver silnika
+}
+
+
+//przyblilzona funkcja pierwiastkowania metoda babilonska
+
+uint32_t pierwiastek(uint32_t val, int32_t err)
+{
+	uint32_t i, imax=50, x, xp;
+	int32_t e;
+
+	i=0;
+	x = xp = 10;
+	do
+	{
+		x = (x + val/x)/2;
+		e = x - xp;
+
+		if (e < 0) e= -e;
+
+		xp = x;	//zapamietaj x z tej iteracji
+		i++;
+	}while(e > err || i > imax);
+
+	return x;
+}
+
+

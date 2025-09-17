@@ -1,0 +1,237 @@
+#include "system_init.h"
+#include "main.h"
+#include "board.h"
+
+extern volatile uint16_t ADCVal[2];
+
+void GPIO_Configuration(void)
+{
+	GPIO_InitTypeDef  GPIO_InitStructure;
+	EXTI_InitTypeDef EXTI_InitStructure;
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = BUTTON_BLACK | BUTTON_RED;		//przyciski
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;	//wejscie
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = BUZZER;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(BUZZER_PORT, &GPIO_InitStructure);
+
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource9);
+	EXTI_InitStructure.EXTI_Line = BUTTON_RED_EXTI;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource8);
+	EXTI_InitStructure.EXTI_Line = BUTTON_BLACK_EXTI;
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+
+}
+
+void Nixie_GPIOConfiguration(void)
+{
+	GPIO_InitTypeDef  GPIO_InitStructure;
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
+	GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable , ENABLE);	//release PA15, PB3, PB4
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;		//wsz
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//wyjscie z wewn. pullups
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+	//
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_All;		//wsz
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//wyjscie z wewn. pullups
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
+
+	//sterowanie DRV8825
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	//wyjscie z wewn. pullups
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_InitStructure.GPIO_Pin = DRV_DIR;
+	GPIO_Init(DRV_DIR_PORT, &GPIO_InitStructure);
+	GPIO_InitStructure.GPIO_Pin = DRV_SLP;
+	GPIO_Init(DRV_SLP_PORT, &GPIO_InitStructure);
+	GPIO_InitStructure.GPIO_Pin = DRV_STP;
+	GPIO_Init(DRV_STP_PORT, &GPIO_InitStructure);
+
+}
+
+void TIM_Configuration(void)
+{
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseStruct;
+
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);	//turn on TIM3
+	TIM_DeInit(TIM3);
+
+	TIM_TimeBaseStruct.TIM_Prescaler = 1000 - 1;	//8MHz/1000 = 8000 Hz
+	TIM_TimeBaseStruct.TIM_Period = 40 - 1;		//200Hz
+	TIM_TimeBaseStruct.TIM_ClockDivision = 0;
+	TIM_TimeBaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStruct);
+
+	TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
+	TIM_Cmd(TIM3, ENABLE);
+
+	//
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);	//turn on TIM2
+	TIM_DeInit(TIM2);
+	TIM_TimeBaseStruct.TIM_Prescaler = 122 - 1;		//8MHz/160 = 65,574kHz
+	TIM_TimeBaseStruct.TIM_Period = 1000 - 1;		//
+	TIM_TimeBaseStruct.TIM_ClockDivision = 0;
+	TIM_TimeBaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStruct);
+	TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
+
+	//TIM4 - okres trwania dzwieku buzzer'a
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);	//turn on TIM2
+	TIM_DeInit(TIM4);
+	TIM_TimeBaseStruct.TIM_Prescaler = 8000 - 1;		//8MHz/8000 = 1 kHz
+	TIM_TimeBaseStruct.TIM_Period = 1000 - 1;		// 1sec
+	TIM_TimeBaseStruct.TIM_ClockDivision = 0;
+	TIM_TimeBaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseInit(TIM4, &TIM_TimeBaseStruct);
+	TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);
+}
+
+
+void RTC_Initialization(void)
+{
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_BKP | RCC_APB1Periph_PWR, ENABLE);
+
+	if (BKP_ReadBackupRegister(BKP_DR1) != 0x1234)	//jesli zresetowane (zanik napiec VCC i BAT)
+	{
+		PWR_BackupAccessCmd(ENABLE);	//access to BKP registers
+
+		BKP_DeInit();
+		BKP_WriteBackupRegister(BKP_DR1, 0x1234);	//wart. kontrolna do BKP reg
+
+		//wejœcie do trybu edycji RTC
+		RTC_EnterConfigMode();
+
+		RCC_LSEConfig(RCC_LSE_ON);
+		while(RCC_GetFlagStatus(RCC_FLAG_LSERDY)==RESET);
+
+		RCC_RTCCLKConfig(RCC_RTCCLKSource_LSE);
+
+		RCC_RTCCLKCmd(ENABLE);
+
+		RTC_WaitForSynchro();
+		RTC_WaitForLastTask();
+
+		RTC_ITConfig(RTC_IT_SEC,ENABLE);
+	//	RTC_ITConfig(RTC_IT_ALR, ENABLE);	//wlacz przerwanie od alarmu
+
+		RTC_WaitForLastTask();
+
+		RTC_SetPrescaler(32768);
+
+		RTC_WaitForLastTask();
+
+		//wyjscie z trybu edycji
+		RTC_ExitConfigMode();
+
+		PWR_BackupAccessCmd(DISABLE);	//access to BKP registers
+	}
+	else
+	{
+		RTC_WaitForSynchro();
+		RTC_ITConfig(RTC_IT_SEC,ENABLE);
+		RTC_WaitForLastTask();
+	}
+	RCC_ClearFlag();
+}
+
+/*konfiguracja Independent Watchdog'a*/
+/*
+void IWDG_Configuration(void)
+{
+	/*konfiguracja watchdog'a na ok. 26 sec.*/
+	/*LSI = 40kHz
+	 * IWDG_clk = 40kHz/256 = 156 Hz
+	 */
+/*	IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);
+	IWDG_SetPrescaler(IWDG_Prescaler_256);
+	IWDG_SetReload(0xfff);
+	IWDG_ReloadCounter();
+	IWDG_Enable();
+}
+*/
+
+void NVIC_Initialization(void)
+{
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0);   
+
+	/* Wybranie grupy priorytetów */
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+
+	// wl obsl przerwan od TIM2 - generator buzzer'ka
+	NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	/*
+		BUTTON BLACK: 	B8
+		BUTTON RED: 	B9
+	*/
+	NVIC_InitStructure.NVIC_IRQChannel = EXTI9_5_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 3;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	// wl obsl przerwan od TIM4
+	NVIC_InitStructure.NVIC_IRQChannel = TIM4_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 4;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	// wl obsl przerwan od TIM3
+	NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 5;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	/* przerwanie co sekunde RTC - aktualizacja rejestrow kalendarza i zegara*/
+	NVIC_InitStructure.NVIC_IRQChannel = RTC_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 6;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+/*
+	NVIC_InitStructure.NVIC_IRQChannel = RTCAlarm_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+*/
+/*
+	EXTI_ClearITPendingBit(EXTI_Line17);
+	EXTI_InitStructure.EXTI_Line = EXTI_Line17;	//line 17 -> RTC Alarm
+	EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+	EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Rising;
+	EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&EXTI_InitStructure);
+*/
+}
